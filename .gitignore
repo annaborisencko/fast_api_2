@@ -1,5 +1,5 @@
 venv/
 .env
 .vscode/
-__pycache__/
-123/
+*/__pycache__/
+as/

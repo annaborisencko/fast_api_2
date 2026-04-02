@@ -26,8 +26,8 @@
 ### 1. Клонирование репозитория
 
 ```bash
-git clone https://github.com/annaborisencko/aiohttp.git
-cd aiohttp
+git clone https://github.com/annaborisencko/fast_api.git
+cd fast_api
 ```
 
 ### 2. Настройка переменных окружения
@@ -61,20 +61,20 @@ docker-compose ps
 Вы должны увидеть два контейнера:
 
 PROJECT_NAME-db - контейнер с PostgreSQL
-PROJECT_NAME-app - контейнер с aiohttp сервером
+PROJECT_NAME-app - контейнер с fast_api сервером
 
 ### 4. Выполнение клиентского скрипта
 
 После успешного запуска контейнеров выполните клиентский скрипт:
 
 ```bash
-docker-compose exec PROJECT_NAME-app python client.py
+docker-compose exec app python client.py
 ```
 
 Или, если используете Python 3:
 
 ```bash
-docker-compose exec PROJECT_NAME-app python3 client.py
+docker-compose exec app python3 client.py
 ```
 
 Результат выполнения отобразится в терминале.
