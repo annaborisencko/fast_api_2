@@ -3,3 +3,4 @@ venv/
 .vscode/
 */__pycache__/
 as/
+Readme_1.md

@@ -4,21 +4,18 @@ from sqlalchemy.exc import IntegrityError
 from fastapi import HTTPException
 
 from .schema import (
-    CreateUserRequest,
-    CreateUserResponse,
-    CreateAdvRequest,
-    CreateAdvResponse,
-    DeleteAdvResponse,
-    GetAdvResponse,
-    SearchAdvResponse,
-    UpdateAdvRequest,
-    UpdateAdvResponse
+    CreateUserRequest, CreateUserResponse, UpdateUserRequest, UpdateUserResponse, GetUserResponse, DeleteUserResponse,
+    LoginUserRequest, LoginUserResponse,
+    CreateAdvRequest, CreateAdvResponse, DeleteAdvResponse, GetAdvResponse,
+    SearchAdvResponse, UpdateAdvRequest, UpdateAdvResponse
 )
 from .lifespan import lifespan
-from .dependancy import SessionDependency
+from .dependancy import SessionDependency, TokenDependency
 from .constants import SUCCESS_RESPONSE
 from . import models
 from . import crud
+from . import auth
+
 
 import datetime
 
@@ -27,20 +24,64 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-@app.post('/api/v1/user', response_model=CreateUserResponse)
-async def create_user(User: CreateUserRequest, session: SessionDependency):
-    user_dict = User.model_dump(exclude_unset=True)
+@app.post('/api/v1/user', tags=["user"], response_model=CreateUserResponse)
+async def create_user(user_data: CreateUserRequest, session: SessionDependency):
+    user_dict = user_data.model_dump(exclude_unset=True)
+    user_dict["password"] = auth.hash_password(user_data.password)
     user_orm_obj = models.User(**user_dict)
     await crud.add_item(session, user_orm_obj)
     return user_orm_obj.id_dict
 
+@app.get('/api/v1/user/{user_id}', response_model=GetUserResponse)
+async def get_user(user_id: int, session: SessionDependency):
+    user_orm_obj = await crud.get_item_by_id(session, models.User, user_id)
+    return user_orm_obj.dict
+
+@app.patch('/api/v1/user/{user_id}', response_model=UpdateUserResponse)
+async def update_user(user_id: int, user_data: UpdateUserRequest, session: SessionDependency, token: TokenDependency):
+    user_dict = user_data.model_dump(exclude_unset=True)
+    if user_dict.get("password"):
+        user_dict["password"] = auth.hash_password(user_data.password)
+    user_orm_obj = await crud.get_item_by_id(session, models.User, user_id)
+    if token.user.role == "admin" or token.user_id == user_orm_obj.id:      
+        for field, value in user_dict.items():
+            setattr(user_orm_obj, field, value)
+        try:
+            await session.commit()
+        except IntegrityError as err:
+            raise HTTPException(409, "Item already exists")
+        return SUCCESS_RESPONSE
+    raise HTTPException(403, "Influent privileges")
+    
+@app.delete('/api/v1/user/{user_id}', response_model=DeleteUserResponse)
+async def delete_user(user_id: int, session: SessionDependency, token: TokenDependency):
+    user_orm_obj = await crud.get_item_by_id(session, models.User, user_id)
+    if token.user.role == "admin" or token.user_id == user_orm_obj.id:
+        await crud.delete_item(session, user_orm_obj)
+        return SUCCESS_RESPONSE
+    raise HTTPException(403, "Influent privileges")
+
+@app.post('/api/v1/login', tags=["login"], response_model=LoginUserResponse)
+async def login(login_data: LoginUserRequest, session: SessionDependency):
+    query = select(models.User).where(models.User.name == login_data.name)
+    user = await session.scalar(query)
+    if user is None:
+        raise HTTPException(401, "Invalid credentials")
+    if not auth.check_password(login_data.password, user.password):
+        raise HTTPException(401, "Invalid credentials")
+    token = models.Token(user_id=user.id)
+    await crud.add_item(session, token)
+    return token.dict
+
 
 @app.post('/api/v1/advertisement', response_model=CreateAdvResponse)
-async def create_adv(Adv: CreateAdvRequest, session: SessionDependency):
+async def create_adv(Adv: CreateAdvRequest, session: SessionDependency, token: TokenDependency):
     adv_dict = Adv.model_dump(exclude_unset=True)
-    adv_orm_obj = models.Adv(**adv_dict)
-    await crud.add_item(session, adv_orm_obj)
-    return adv_orm_obj.id_dict
+    adv_orm_obj = models.Adv(**adv_dict, user_id=token.user_id)
+    if token.user.role == "admin" or token.user_id == adv_orm_obj.user_id:
+        await crud.add_item(session, adv_orm_obj)
+        return adv_orm_obj.id_dict
+    raise HTTPException(403, "Influent privileges")
 
 
 @app.get('/api/v1/advertisement/{adv_id}', response_model=GetAdvResponse)
@@ -99,20 +140,24 @@ async def search_adv(
 
 
 @app.patch('/api/v1/advertisement/{adv_id}', response_model=UpdateAdvResponse)
-async def update_adv(adv_id: int, adv_data: UpdateAdvRequest, session: SessionDependency):
+async def update_adv(adv_id: int, adv_data: UpdateAdvRequest, session: SessionDependency, token: TokenDependency):
     adv_dict = adv_data.model_dump(exclude_unset=True)
     adv_orm_obj = await crud.get_item_by_id(session, models.Adv, adv_id)
+    if token.user.role == "admin" or token.user_id == adv_orm_obj.user_id:
+        for field, value in adv_dict.items():
+            setattr(adv_orm_obj, field, value)
+        try:
+            await session.commit()
+        except IntegrityError as err:
+            raise HTTPException(409, "Item already exists")
+        return SUCCESS_RESPONSE
+    raise HTTPException(403, "Influent privileges")
 
-    for field, value in adv_dict.items():
-        setattr(adv_orm_obj, field, value)
-    try:
-        await session.commit()
-    except IntegrityError as err:
-        raise HTTPException(409, "Item already exists")
-    return SUCCESS_RESPONSE
 
-
-@app.delete('/api/v1/advertisement/{adv_id}', status_code=204)
-async def delete_adv(adv_id: int, session: SessionDependency):
+@app.delete('/api/v1/advertisement/{adv_id}', response_model=DeleteAdvResponse)
+async def delete_adv(adv_id: int, session: SessionDependency, token: TokenDependency):
     adv_orm_obj = await crud.get_item_by_id(session, models.Adv, adv_id)
-    await crud.delete_item(session, adv_orm_obj)
+    if token.user.role == "admin" or token.user.id == adv_orm_obj.user_id:
+        await crud.delete_item(session, adv_orm_obj)
+        return SUCCESS_RESPONSE
+    raise HTTPException(403, "Influent privileges")
