@@ -10,15 +10,14 @@ async def add_item(session: AsyncSession, item: ORM_OBJ):
         await session.commit()
         await session.refresh(item)
 
-    except IntegrityError as err:
+    except IntegrityError:
         raise HTTPException(409, "Item already exists")
 
-async def get_item_by_id(
-    session: AsyncSession, orm_cls: ORM_CLS, item_id: int
-) -> ORM_OBJ:
+
+async def get_item_by_id(session: AsyncSession, orm_cls: ORM_CLS, item_id: int) -> ORM_OBJ:
     orm_obj = await session.get(orm_cls, item_id)
     if orm_obj is None:
-        raise HTTPException(404, f"Item not foud")
+        raise HTTPException(404, "Item not found")
     return orm_obj
 
 
