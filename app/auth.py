@@ -1,7 +1,7 @@
 import bcrypt
 import jwt
 from datetime import datetime, timedelta
-from config import ACCESS_TOKEN_EXPIRE_SECONDS, ALGORITHM, SECRET_KEY
+from .config import ACCESS_TOKEN_EXPIRE_SECONDS, ALGORITHM, SECRET_KEY
 
 
 def generate_token(user_data: dict, expires_in: int = None):
