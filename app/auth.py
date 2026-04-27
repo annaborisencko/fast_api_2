@@ -1,14 +1,14 @@
 import bcrypt
 import jwt
 from datetime import datetime, timedelta
-from .config import ACCESS_TOKEN_EXPIRE_SECONDS, ALGORITHM, SECRET_KEY
+from config import ACCESS_TOKEN_EXPIRE_SECONDS, ALGORITHM, SECRET_KEY
 
 
 def generate_token(user_data: dict, expires_in: int = None):
     if expires_in:
-        expire = datetime.now() + expires_in
+        expire = datetime.utcnow() + timedelta(seconds=expires_in)
     else:
-        expire = datetime.now() + timedelta(seconds=ACCESS_TOKEN_EXPIRE_SECONDS)
+        expire = datetime.utcnow() + timedelta(seconds=ACCESS_TOKEN_EXPIRE_SECONDS)
     user_data.update({"exp": expire})
     token = jwt.encode(user_data, SECRET_KEY, algorithm=ALGORITHM)
     return token

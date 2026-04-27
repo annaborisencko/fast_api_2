@@ -56,7 +56,6 @@ async def update_user(
     if user_dict.get("password"):
         user_dict["password"] = hash_password(user_data.password)
     user_orm_obj = await crud.get_item_by_id(session, models.User, user_id)
-    # if token.user.role == "admin" or token.user_id == user_orm_obj.id:
     if token.role == "admin" or token.id == user_orm_obj.id:
         for field, value in user_dict.items():
             setattr(user_orm_obj, field, value)
@@ -71,7 +70,6 @@ async def update_user(
 @app.delete("/api/v1/user/{user_id}", response_model=DeleteUserResponse)
 async def delete_user(user_id: int, session: SessionDependency, token: TokenDependency):
     user_orm_obj = await crud.get_item_by_id(session, models.User, user_id)
-    # if token.user.role == "admin" or token.user_id == user_orm_obj.id:
     if token.role == "admin" or token.id == user_orm_obj.id:
         await crud.delete_item(session, user_orm_obj)
         return SUCCESS_RESPONSE
@@ -86,18 +84,15 @@ async def login(login_data: LoginUserRequest, session: SessionDependency):
         raise HTTPException(401, "Invalid credentials")
     if not check_password(login_data.password, user.password):
         raise HTTPException(401, "Invalid credentials")
-    # token = models.Token(user_id=user.id)
     token = generate_token(user_data={"user_id": user.id, "username": user.name, "role": user.role})
     return {"token": token}
-    # await crud.add_item(session, token)
-    # return token.dict
+
 
 
 @app.post("/api/v1/advertisement", response_model=CreateAdvResponse)
 async def create_adv(Adv: CreateAdvRequest, session: SessionDependency, token: TokenDependency):
     adv_dict = Adv.model_dump(exclude_unset=True)
     adv_orm_obj = models.Adv(**adv_dict, user_id=token.id)
-    # if token.user.role == "admin" or token.user_id == adv_orm_obj.user_id:
     if token.role == "admin" or token.id == adv_orm_obj.user_id:
         await crud.add_item(session, adv_orm_obj)
         return adv_orm_obj.id_dict
@@ -165,7 +160,6 @@ async def update_adv(
 ):
     adv_dict = adv_data.model_dump(exclude_unset=True)
     adv_orm_obj = await crud.get_item_by_id(session, models.Adv, adv_id)
-    # if token.user.role == "admin" or token.user_id == adv_orm_obj.user_id:
     if token.role == "admin" or token.id == adv_orm_obj.user_id:
         for field, value in adv_dict.items():
             setattr(adv_orm_obj, field, value)
@@ -180,7 +174,6 @@ async def update_adv(
 @app.delete("/api/v1/advertisement/{adv_id}", response_model=DeleteAdvResponse)
 async def delete_adv(adv_id: int, session: SessionDependency, token: TokenDependency):
     adv_orm_obj = await crud.get_item_by_id(session, models.Adv, adv_id)
-    # if token.user.role == "admin" or token.user_id == adv_orm_obj.user_id:
     if token.role == "admin" or token.id == adv_orm_obj.user_id:
         await crud.delete_item(session, adv_orm_obj)
         return SUCCESS_RESPONSE
